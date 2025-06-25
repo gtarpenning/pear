@@ -11,8 +11,8 @@ import shutil
 from typing import Optional, List
 from datetime import datetime
 
-from message_system import MessageHandler, ChatMessage
-from llm_agent import LLMAgent
+from .message_system import MessageHandler, ChatMessage
+from .llm_agent import LLMAgent
 
 
 class SimpleTerminalInterface:

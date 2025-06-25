@@ -13,7 +13,7 @@ try:
 except ImportError:
     litellm = None
 
-from message_system import MessageHandler, ChatMessage
+from .message_system import MessageHandler, ChatMessage
 
 
 class LLMAgent:

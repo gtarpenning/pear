@@ -11,10 +11,10 @@ from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
 
-from network_layer import NetworkManager
-from message_system import MessageHandler
-from simple_terminal_ui import SimpleTerminalInterface
-from config import PearConfig
+from .network_layer import NetworkManager
+from .message_system import MessageHandler
+from .simple_terminal_ui import SimpleTerminalInterface
+from .config import PearConfig
 
 
 class PearCLI:
