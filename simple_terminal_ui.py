@@ -22,14 +22,20 @@ class SimpleTerminalInterface:
         self.is_host = False
         self.message_handler = None
         self.last_message_count = 0
+        self.network_manager = None
         
-    def start_chat_interface(self, session_name: str, is_host: bool, message_handler: MessageHandler):
+    def start_chat_interface(self, session_name: str, is_host: bool, message_handler: MessageHandler, network_manager=None):
         """Start the main chat interface"""
         self.session_name = session_name
         self.is_host = is_host
         self.message_handler = message_handler
+        self.network_manager = network_manager
         self.current_user = self._get_username()
         self.running = True
+        
+        # Set up network callbacks if network manager is provided
+        if self.network_manager:
+            self.network_manager.add_message_callback(self._handle_network_event)
         
         # Add welcome messages
         if is_host:
@@ -102,9 +108,6 @@ class SimpleTerminalInterface:
     
     def _update_message_area(self):
         """Update only the message area without affecting input"""
-        # Save current cursor position
-        print("\033[s", end="")  # Save cursor position
-        
         # Move to message area (line 5, after header)
         print("\033[5;1H", end="")  # Move to line 5, column 1
         
@@ -133,19 +136,21 @@ class SimpleTerminalInterface:
         else:
             print("\033[90mNo messages yet... Start chatting!\033[0m")
         
-        # Restore cursor position
-        print("\033[u", end="", flush=True)  # Restore cursor position
+        # Move cursor to input line (line 22, after the separator)
+        print("\033[22;1H", end="", flush=True)  # Move to input line
     
     def _input_loop(self):
         """Main input loop with persistent input prompt"""        
         while self.running:
             try:
+                # Ensure cursor is at the input line
+                print("\033[22;1H\033[2K", end="")  # Move to line 22 and clear it
                 # Display persistent input prompt
                 print("\033[1;37m> \033[0m", end="", flush=True)
                 user_input = input().strip()
                 
                 # Clear the input line after hitting enter
-                print("\033[1A\033[2K", end="")  # Move up one line and clear it
+                print("\033[22;1H\033[2K", end="")  # Clear the input line
                 
                 if not user_input:
                     continue
@@ -156,15 +161,17 @@ class SimpleTerminalInterface:
                     # Send regular message
                     self.message_handler.add_message(self.current_user, user_input)
                     
-                    # Mock: simulate sending to network
-                    if hasattr(self, 'network_manager'):
+                    # Send to network if available
+                    if self.network_manager:
                         self.network_manager.send_message(user_input, self.current_user)
                         
             except (EOFError, KeyboardInterrupt):
                 self.running = False
                 break
             except Exception as e:
-                print(f"\033[31mError: {e}\033[0m")
+                # Display error at input line
+                print(f"\033[22;1H\033[2K\033[31mError: {e}\033[0m")
+                time.sleep(1)  # Brief pause to show error
                 continue
     
     def _handle_command(self, command: str):
@@ -210,7 +217,18 @@ class SimpleTerminalInterface:
     
     def _show_users(self):
         """Show connected users"""
-        users_text = "Connected users:\n• alice (online)\n• bob (typing)\n• you (online)"
+        if self.network_manager:
+            peers = self.network_manager.get_connected_peers()
+            if peers:
+                users_text = "Connected users:\n"
+                for peer in peers:
+                    users_text += f"• {peer.username}@{peer.hostname} (online)\n"
+                users_text += f"• {self.current_user} (you)"
+            else:
+                users_text = f"Connected users:\n• {self.current_user} (you - hosting)" if self.is_host else f"Connected users:\n• {self.current_user} (you)"
+        else:
+            users_text = f"Connected users:\n• {self.current_user} (you - no network)"
+        
         self.message_handler.add_system_message(users_text)
     
     def show_session_list(self, sessions: List[dict]):
@@ -242,4 +260,21 @@ class SimpleTerminalInterface:
         print("\033[1;36m🍐 Pear Chat\033[0m")
         print("\033[36mP2P Terminal Messaging\033[0m")
         print("\033[36m" + "=" * 25 + "\033[0m")
-        print() 
+        print()
+    
+    def _handle_network_event(self, event_type: str, data):
+        """Handle network events and convert them to chat messages"""
+        if event_type == 'peer_joined':
+            peer_info = data
+            self.message_handler.add_system_message(f"{peer_info.username} joined the chat")
+        elif event_type == 'peer_left':
+            peer_info = data
+            self.message_handler.add_system_message(f"{peer_info.username} left the chat")
+        elif event_type == 'message_received':
+            message_data = data
+            if message_data.get('type') == 'chat_message':
+                self.message_handler.add_message(
+                    message_data['username'], 
+                    message_data['content'],
+                    message_data.get('timestamp')
+                ) 
