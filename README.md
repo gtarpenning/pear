@@ -1,22 +1,28 @@
-# 🍐 Pear - P2P Terminal Chat MVP
+# Pear Chat
 
-A peer-to-peer command line messaging tool for local network communication with a beautiful terminal interface powered by Rich.
+P2P terminal chat for local networks.
 
-<img width="1510" alt="image" src="https://github.com/user-attachments/assets/aa79773c-2e4c-435e-9fad-e0079dd168a6" />
+<img width="1510" alt="image" src="https://github.com/user-attachments/assets/
+aa79773c-2e4c-435e-9fad-e0079dd168a6" />
 
-## Usage
-
-### Basic Commands
+## Install
 
 ```bash
 pip install pear-chat
+```
 
-# Start a new chat session
-pear-chat start [session_name]
+## Usage
 
-# Join an existing session
-pear-chat join [session_name]
+```bash
+# Start a session
+pear start mysession
+
+# Join a session
+pear join mysession
 
 # List available sessions
-pear-chat list
+pear list
+
+# Set username for future sessions
+pear login myusername
 ```
