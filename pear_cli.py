@@ -8,16 +8,23 @@ import argparse
 import sys
 from typing import Optional
 
+from rich.console import Console
+from rich.panel import Panel
+
 from network_layer import NetworkManager
 from message_system import MessageHandler
 from simple_terminal_ui import SimpleTerminalInterface
+from config import PearConfig
 
 
 class PearCLI:
-    def __init__(self):
+    def __init__(self, username: Optional[str] = None):
+        self.config = PearConfig()
+        self.console = Console()
+        self.username = username or self.config.get_username()
         self.network_manager = NetworkManager()
         self.message_handler = MessageHandler()
-        self.terminal_ui = SimpleTerminalInterface()
+        self.terminal_ui = SimpleTerminalInterface(self.username)
         
     def start_session(self, session_name: Optional[str] = None):
         """Start hosting a chat session"""
@@ -89,6 +96,39 @@ class PearCLI:
                 print("No active sessions found on the network")
         
         return sessions
+    
+    def login(self, username: Optional[str] = None):
+        """Store username in config for future use"""
+        if not username:
+            username = self.console.input("[bold cyan]Enter your username: [/bold cyan]").strip()
+            if not username:
+                self.console.print("[red]Username cannot be empty[/red]")
+                return
+        
+        self.config.set_username(username)
+        self.console.print(Panel(
+            f"[green]✅ Username '[bold]{username}[/bold]' saved successfully![/green]\n"
+            f"You can now use Pear without entering your username each time.",
+            title="Login Complete",
+            border_style="green"
+        ))
+    
+    def show_config(self):
+        """Show current configuration"""
+        config = self.config.get_all()
+        if not config:
+            self.console.print("[yellow]No configuration found[/yellow]")
+            return
+        
+        config_text = ""
+        for key, value in config.items():
+            config_text += f"[cyan]{key}[/cyan]: [white]{value}[/white]\n"
+        
+        self.console.print(Panel(
+            config_text.strip(),
+            title="Current Configuration",
+            border_style="blue"
+        ))
 
 
 def main():
@@ -96,6 +136,9 @@ def main():
         description="Pear - P2P Terminal Chat",
         prog="pear"
     )
+    
+    # Global username flag
+    parser.add_argument('-u', '--username', help='Username to use (overrides saved config)')
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
@@ -110,13 +153,20 @@ def main():
     # List command
     list_parser = subparsers.add_parser('list', help='List available sessions on network')
     
+    # Login command
+    login_parser = subparsers.add_parser('login', help='Save username to config')
+    login_parser.add_argument('username', nargs='?', help='Username to save')
+    
+    # Config command
+    config_parser = subparsers.add_parser('config', help='Show current configuration')
+    
     args = parser.parse_args()
     
     if not args.command:
         parser.print_help()
         return
     
-    pear = PearCLI()
+    pear = PearCLI(username=args.username)
     
     try:
         if args.command == 'start':
@@ -125,6 +175,10 @@ def main():
             pear.join_session(args.session_name)
         elif args.command == 'list':
             pear.list_sessions()
+        elif args.command == 'login':
+            pear.login(args.username)
+        elif args.command == 'config':
+            pear.show_config()
     except KeyboardInterrupt:
         print("\nExiting...")
         sys.exit(0)

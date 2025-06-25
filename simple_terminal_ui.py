@@ -21,10 +21,10 @@ from message_system import MessageHandler, ChatMessage
 class SimpleTerminalInterface:
     """Simple, fast terminal interface for chat"""
     
-    def __init__(self):
+    def __init__(self, username: Optional[str] = None):
         self.console = Console()
         self.running = False
-        self.current_user = None
+        self.current_user = username
         self.session_name = None
         self.is_host = False
         self.message_handler = None
@@ -36,7 +36,8 @@ class SimpleTerminalInterface:
         self.session_name = session_name
         self.is_host = is_host
         self.message_handler = message_handler
-        self.current_user = self._get_username()
+        if not self.current_user:
+            self.current_user = self._get_username()
         self.running = True
         
         # Add welcome messages
