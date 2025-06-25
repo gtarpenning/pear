@@ -11,6 +11,7 @@ from typing import Optional
 from network_layer import NetworkManager
 from message_system import MessageHandler
 from simple_terminal_ui import SimpleTerminalInterface
+from config import PearConfig
 
 
 class PearCLI:
@@ -18,8 +19,21 @@ class PearCLI:
         self.network_manager = NetworkManager()
         self.message_handler = MessageHandler()
         self.terminal_ui = SimpleTerminalInterface()
+        self.config = PearConfig()
         
-    def start_session(self, session_name: Optional[str] = None):
+    def _get_username(self, provided_username: Optional[str] = None) -> Optional[str]:
+        """Get username from various sources in order of priority"""
+        if provided_username:
+            return provided_username
+        
+        config_username = self.config.get_username()
+        if config_username:
+            return config_username
+        
+        # Fallback to prompting (this will be handled by terminal UI)
+        return None
+        
+    def start_session(self, session_name: Optional[str] = None, username: Optional[str] = None):
         """Start hosting a chat session"""
         if not session_name:
             session_name = f"session_{self.network_manager.get_local_hostname()}"
@@ -30,14 +44,18 @@ class PearCLI:
         self.network_manager.start_discovery_service()
         self.network_manager.start_message_server()
         
+        # Get username
+        username = self._get_username(username)
+        
         # Start the chat interface
         self.terminal_ui.start_chat_interface(
             session_name=session_name,
             is_host=True,
-            message_handler=self.message_handler
+            message_handler=self.message_handler,
+            username=username
         )
     
-    def join_session(self, session_name: Optional[str] = None):
+    def join_session(self, session_name: Optional[str] = None, username: Optional[str] = None):
         """Join an existing chat session"""
         if not session_name:
             # Show available sessions and let user choose
@@ -69,11 +87,15 @@ class PearCLI:
             print(f"Failed to connect to session: {session_name}")
             return
         
+        # Get username
+        username = self._get_username(username)
+        
         # Start the chat interface
         self.terminal_ui.start_chat_interface(
             session_name=session_name,
             is_host=False,
-            message_handler=self.message_handler
+            message_handler=self.message_handler,
+            username=username
         )
     
     def list_sessions(self, show_output: bool = True):
@@ -89,6 +111,26 @@ class PearCLI:
                 print("No active sessions found on the network")
         
         return sessions
+    
+    def login(self, username: str):
+        """Store username in config for future sessions"""
+        self.config.set_username(username)
+        print(f"Username '{username}' saved to config")
+    
+    def logout(self):
+        """Clear stored username from config"""
+        self.config.set_username("")
+        print("Username cleared from config")
+    
+    def config_info(self):
+        """Show current configuration"""
+        settings = self.config.get_all_settings()
+        if settings:
+            print("Current configuration:")
+            for key, value in settings.items():
+                print(f"  {key}: {value}")
+        else:
+            print("No configuration found")
 
 
 def main():
@@ -102,13 +144,25 @@ def main():
     # Start command
     start_parser = subparsers.add_parser('start', help='Start hosting a chat session')
     start_parser.add_argument('session_name', nargs='?', help='Name of the session to create')
+    start_parser.add_argument('-u', '--username', help='Username for the chat session')
     
     # Join command  
     join_parser = subparsers.add_parser('join', help='Join an existing chat session')
     join_parser.add_argument('session_name', nargs='?', help='Name of the session to join')
+    join_parser.add_argument('-u', '--username', help='Username for the chat session')
     
     # List command
     list_parser = subparsers.add_parser('list', help='List available sessions on network')
+    
+    # Login command
+    login_parser = subparsers.add_parser('login', help='Store username in config')
+    login_parser.add_argument('username', help='Username to store')
+    
+    # Logout command
+    logout_parser = subparsers.add_parser('logout', help='Clear stored username from config')
+    
+    # Config command
+    config_parser = subparsers.add_parser('config', help='Show current configuration')
     
     args = parser.parse_args()
     
@@ -120,11 +174,17 @@ def main():
     
     try:
         if args.command == 'start':
-            pear.start_session(args.session_name)
+            pear.start_session(args.session_name, args.username)
         elif args.command == 'join':
-            pear.join_session(args.session_name)
+            pear.join_session(args.session_name, args.username)
         elif args.command == 'list':
             pear.list_sessions()
+        elif args.command == 'login':
+            pear.login(args.username)
+        elif args.command == 'logout':
+            pear.logout()
+        elif args.command == 'config':
+            pear.config_info()
     except KeyboardInterrupt:
         print("\nExiting...")
         sys.exit(0)

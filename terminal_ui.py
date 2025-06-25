@@ -31,12 +31,12 @@ class TerminalInterface:
         self.message_handler = None
         self.last_message_count = 0
         
-    def start_chat_interface(self, session_name: str, is_host: bool, message_handler: MessageHandler):
+    def start_chat_interface(self, session_name: str, is_host: bool, message_handler: MessageHandler, username: Optional[str] = None):
         """Start the main chat interface"""
         self.session_name = session_name
         self.is_host = is_host
         self.message_handler = message_handler
-        self.current_user = self._get_username()
+        self.current_user = username if username else self._get_username()
         self.running = True
         
         # Show startup banner
