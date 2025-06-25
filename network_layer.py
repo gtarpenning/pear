@@ -252,9 +252,6 @@ class NetworkManager:
                 try:
                     data = client_socket.recv(4096)
                     if not data:
-                        console.print(
-                            f"[yellow]Peer {address[0]}:{address[1]} disconnected[/yellow]"
-                        )
                         break
 
                     message = json.loads(data.decode())
@@ -295,9 +292,6 @@ class NetworkManager:
             )
         finally:
             if peer_id:
-                console.print(
-                    f"[yellow]Cleaning up peer connection: {peer_id}[/yellow]"
-                )
                 self._disconnect_peer(peer_id)
             try:
                 client_socket.close()

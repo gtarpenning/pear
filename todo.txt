@@ -1,0 +1,2 @@
+- each user should get their own color
+- code quality is rough, need to refactor and clean up
