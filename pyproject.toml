@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools-scm[toml]>=6.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pear"
+version = "0.1.0"
+description = "P2P Terminal Chat - Decentralized chat application for local networks"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Griffin Tarpenning", email = "gtarpenning@gmail.com"}
+]
+maintainers = [
+    {name = "Griffin Tarpenning", email = "gtarpenning@gmail.com"}
+]
+keywords = ["p2p", "chat", "terminal", "networking", "decentralized"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Chat",
+    "Topic :: Internet",
+    "Topic :: System :: Networking",
+    "Topic :: Terminals",
+    "Environment :: Console",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "pylint>=2.12.0",
+    "pytest>=7.0.0",
+    "build>=0.8.0",
+    "twine>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/gtarpenning/pear"
+Documentation = "https://github.com/gtarpenning/pear#readme"
+Repository = "https://github.com/gtarpenning/pear"
+"Bug Tracker" = "https://github.com/gtarpenning/pear/issues"
+
+[project.scripts]
+pear = "pear_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["tests*", "test_*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+
+[tool.pylint.messages_control]
+disable = ["C0114", "C0116", "R0903"] 
