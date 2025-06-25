@@ -10,6 +10,7 @@ A peer-to-peer command line messaging tool for local network communication with 
 - 👥 **Multi-user Support**: Multiple users in the same chat session
 - 🎨 **Rich UI**: Beautiful terminal interface with panels, colors, and layouts
 - ⚡ **Commands**: Built-in chat commands (/help, /quit, /stats, etc.)
+- 🤖 **AI Assistant**: Chat with LLM-powered AI agents using litellm
 
 ## Installation
 
@@ -50,6 +51,9 @@ Once in a chat session, you can use these commands:
 - `/clear` - Clear message history
 - `/stats` - Show chat statistics
 - `/users` - Show connected users
+- `/llm activate [name]` - Invite AI assistant to chat (with optional custom name)
+- `/llm deactivate` - Remove AI assistant from chat
+- `/llm model <model_name>` - Change AI model (e.g., gpt-4, claude-3, etc.)
 
 ### Testing
 
@@ -83,6 +87,12 @@ The MVP consists of several modular components:
 - Live updating chat display
 - User input handling and command processing
 
+### 5. LLM Agent (`llm_agent.py`)
+- AI assistant integration using litellm
+- Context-aware responses based on chat history
+- Random woman names for personalized experience
+- Mention-based activation (responds when name is mentioned)
+
 ## Current State
 
 This is an **MVP with mocked networking**. The P2P networking components are currently simulated for testing and development purposes.
@@ -94,6 +104,8 @@ This is an **MVP with mocked networking**. The P2P networking components are cur
 ✅ Mock network discovery and sessions  
 ✅ Interactive chat interface  
 ✅ Chat commands and user management  
+✅ AI assistant integration with litellm  
+✅ Context-aware LLM responses  
 
 ### Next Steps:
 🔄 Implement real UDP discovery protocol  
@@ -119,9 +131,41 @@ This is an **MVP with mocked networking**. The P2P networking components are cur
    python pear_cli.py list
    ```
 
+## AI Assistant Setup
+
+To use the AI assistant feature:
+
+1. **Install litellm:**
+   ```bash
+   pip install litellm
+   ```
+
+2. **Set up your API key** (example for OpenAI):
+   ```bash
+   export OPENAI_API_KEY="your-api-key-here"
+   ```
+
+3. **Available models:**
+   - OpenAI: `gpt-3.5-turbo`, `gpt-4`, `gpt-4o`
+   - Anthropic: `claude-3-sonnet`, `claude-3-haiku`
+   - And many more via litellm
+
+4. **Usage:**
+   ```bash
+   # Start a chat session
+   python pear_cli.py start
+   
+   # Activate AI assistant
+   /llm activate
+   
+   # Chat with the AI by mentioning her name
+   "Hey Sarah, tell me about pelicans please"
+   ```
+
 ## Dependencies
 
 - **rich**: Beautiful terminal interface components
+- **litellm**: LLM integration for AI assistant
 - **Python 3.7+**: Required for modern Python features
 
 ## Development

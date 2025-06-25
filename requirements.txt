@@ -1,2 +1,3 @@
 rich>=13.0.0
-getch>=1.0 
+getch>=1.0
+litellm>=1.0.0 

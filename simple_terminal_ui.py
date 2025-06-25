@@ -16,6 +16,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from message_system import MessageHandler, ChatMessage
+from llm_agent import LLMAgent
 
 
 class SimpleTerminalInterface:
@@ -28,14 +29,16 @@ class SimpleTerminalInterface:
         self.session_name = None
         self.is_host = False
         self.message_handler = None
+        self.llm_agent = None
         self.last_display_height = 0
         self.input_active = False  # Flag to pause display updates during input
         
-    def start_chat_interface(self, session_name: str, is_host: bool, message_handler: MessageHandler):
+    def start_chat_interface(self, session_name: str, is_host: bool, message_handler: MessageHandler, llm_agent: LLMAgent = None):
         """Start the main chat interface"""
         self.session_name = session_name
         self.is_host = is_host
         self.message_handler = message_handler
+        self.llm_agent = llm_agent
         self.current_user = self._get_username()
         self.running = True
         
@@ -124,12 +127,19 @@ class SimpleTerminalInterface:
         print("\033[1;34m👥 Users:\033[0m")
         print("─" * 20)
         
-        # Mock users for now
-        users = [
-            (self.current_user, "online", True),
+        # Build user list
+        users = [(self.current_user, "online", True)]
+        
+        # Add LLM agent if active
+        if self.llm_agent and self.llm_agent.is_active():
+            agent_name = self.llm_agent.get_name()
+            users.append((f"{agent_name} (AI)", "online", False))
+        
+        # Add mock users for now
+        users.extend([
             ("alice", "online", False),
             ("bob", "typing", False)
-        ]
+        ])
         
         for name, status, is_self in users:
             status_icon = "🟢" if status == "online" else "🟡"
@@ -191,6 +201,8 @@ class SimpleTerminalInterface:
             self._show_stats()
         elif cmd == "users":
             self._show_users()
+        elif cmd == "llm":
+            self._handle_llm_command(cmd_parts[1:])
         else:
             self.message_handler.add_system_message(f"Unknown command: {command}")
     
@@ -198,6 +210,8 @@ class SimpleTerminalInterface:
         """Show help message"""
         help_text = """Available commands:
 /help - Show this help message
+/llm [activate|deactivate|model <name>] - Control AI assistant
+/llm activate [name] - Invite AI assistant to chat (with optional custom name)
 /quit or /exit - Leave the chat
 /clear - Clear message history and screen
 /stats - Show chat statistics
@@ -254,4 +268,53 @@ class SimpleTerminalInterface:
 \033[0m
 Real-time messaging on your local network
 """
-        print(banner) 
+        print(banner)
+    
+    def _handle_llm_command(self, args: List[str]):
+        """Handle LLM-related commands"""
+        if not self.llm_agent:
+            self.message_handler.add_system_message("LLM agent not available in this session")
+            return
+        
+        if not args:
+            # Show LLM status
+            if self.llm_agent.is_active():
+                name = self.llm_agent.get_name()
+                self.message_handler.add_system_message(f"AI assistant '{name}' is active. Mention her name to chat!")
+            else:
+                self.message_handler.add_system_message("AI assistant is not active. Use '/llm activate' to invite one.")
+            return
+        
+        cmd = args[0].lower()
+        
+        if cmd == "activate":
+            if self.llm_agent.is_active():
+                name = self.llm_agent.get_name()
+                self.message_handler.add_system_message(f"AI assistant '{name}' is already active!")
+                return
+            
+            try:
+                # Check if custom name provided
+                custom_name = args[1] if len(args) > 1 else None
+                agent_name = self.llm_agent.activate(custom_name)
+                self.message_handler.add_system_message(f"Say hello to {agent_name}! Mention her name to start chatting.")
+            except Exception as e:
+                self.message_handler.add_system_message(f"Failed to activate AI assistant: {str(e)}")
+        
+        elif cmd == "deactivate":
+            if not self.llm_agent.is_active():
+                self.message_handler.add_system_message("AI assistant is not active.")
+                return
+            
+            self.llm_agent.deactivate()
+        
+        elif cmd == "model":
+            if len(args) < 2:
+                self.message_handler.add_system_message("Usage: /llm model <model_name>")
+                return
+            
+            model_name = args[1]
+            self.llm_agent.set_model(model_name)
+        
+        else:
+            self.message_handler.add_system_message(f"Unknown LLM command: {cmd}. Use '/help' for available commands.") 

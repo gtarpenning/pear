@@ -11,6 +11,7 @@ from typing import Optional
 from network_layer import NetworkManager
 from message_system import MessageHandler
 from simple_terminal_ui import SimpleTerminalInterface
+from llm_agent import LLMAgent
 
 
 class PearCLI:
@@ -18,6 +19,7 @@ class PearCLI:
         self.network_manager = NetworkManager()
         self.message_handler = MessageHandler()
         self.terminal_ui = SimpleTerminalInterface()
+        self.llm_agent = LLMAgent(self.message_handler)
         
     def start_session(self, session_name: Optional[str] = None):
         """Start hosting a chat session"""
@@ -34,7 +36,8 @@ class PearCLI:
         self.terminal_ui.start_chat_interface(
             session_name=session_name,
             is_host=True,
-            message_handler=self.message_handler
+            message_handler=self.message_handler,
+            llm_agent=self.llm_agent
         )
     
     def join_session(self, session_name: Optional[str] = None):
@@ -73,7 +76,8 @@ class PearCLI:
         self.terminal_ui.start_chat_interface(
             session_name=session_name,
             is_host=False,
-            message_handler=self.message_handler
+            message_handler=self.message_handler,
+            llm_agent=self.llm_agent
         )
     
     def list_sessions(self, show_output: bool = True):
