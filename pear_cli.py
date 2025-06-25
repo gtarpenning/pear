@@ -26,6 +26,9 @@ class PearCLI:
         
         print(f"Starting chat session: {session_name}")
         
+        # Create the session first
+        self.network_manager.create_session(session_name)
+        
         # Initialize network components
         self.network_manager.start_discovery_service()
         self.network_manager.start_message_server()
