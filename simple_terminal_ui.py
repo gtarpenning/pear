@@ -1,6 +1,6 @@
 """
-Simple Terminal UI - Fast and reliable chat interface
-Uses basic terminal control instead of Rich Live display
+Simple Terminal UI - Dead simple chat interface
+Uses only standard terminal operations and ANSI codes
 """
 
 import os
@@ -9,27 +9,19 @@ import time
 from typing import Optional, List
 from datetime import datetime
 
-from rich.console import Console
-from rich.text import Text
-from rich import box
-from rich.panel import Panel
-from rich.table import Table
-
 from message_system import MessageHandler, ChatMessage
 
 
 class SimpleTerminalInterface:
-    """Simple, fast terminal interface for chat"""
+    """Dead simple terminal interface for chat"""
     
-    def __init__(self):
-        self.console = Console()
+    def __init__(self, username: str):
         self.running = False
-        self.current_user = None
+        self.current_user = username
         self.session_name = None
         self.is_host = False
         self.message_handler = None
-        self.last_display_height = 0
-        self.input_active = False  # Flag to pause display updates during input
+        self.last_message_count = 0
         
     def start_chat_interface(self, session_name: str, is_host: bool, message_handler: MessageHandler):
         """Start the main chat interface"""
@@ -48,6 +40,9 @@ class SimpleTerminalInterface:
         
         message_handler.add_system_message(f"Welcome {self.current_user}! Type /help for commands")
         
+        # Initial display
+        self._render_initial_display()
+        
         # Start display updater thread
         display_thread = threading.Thread(target=self._display_loop, daemon=True)
         display_thread.start()
@@ -57,100 +52,100 @@ class SimpleTerminalInterface:
     
     def _get_username(self) -> str:
         """Get username from user"""
-        return self.console.input("[bold cyan]Enter your username: [/bold cyan]") or "user"
+        if self.current_user is None:
+            print("\033[1;36mEnter your username: \033[0m", end="", flush=True)
+            username = input().strip()
+            return username or "user"
+        else:
+            return self.current_user
     
     def _clear_screen(self):
         """Clear the terminal screen"""
         os.system('clear' if os.name == 'posix' else 'cls')
     
-    def _move_cursor_up(self, lines: int):
-        """Move cursor up by specified lines"""
-        print(f"\033[{lines}A", end="")
-    
-    def _clear_lines(self, lines: int):
-        """Clear specified number of lines"""
-        for _ in range(lines):
-            print("\033[2K\033[1A", end="")  # Clear line and move up
-        print("\033[2K", end="")  # Clear current line
+    def _render_initial_display(self):
+        """Render the initial display setup"""
+        self._clear_screen()
+        
+        # Header
+        print(f"\033[1;36m🍐 Pear Chat - {self.session_name}\033[0m")
+        print(f"\033[36m{'Host' if self.is_host else 'Participant'} | User: {self.current_user}\033[0m")
+        print("\033[36m" + "=" * 50 + "\033[0m")
+        print()
+        
+        # Reserve space for messages (we'll update this area)
+        print("\n" * 15)  # Reserve 15 lines for messages
+        
+        # Fixed bottom section
+        print("\033[90m" + "-" * 50 + "\033[0m")
+        print("\033[90mType /help for commands | /quit to exit\033[0m")
+        print()
+        
+        # Update message count
+        self.last_message_count = len(self.message_handler.get_messages())
+        
+        # Move cursor up to message area and display messages
+        self._update_message_area()
     
     def _display_loop(self):
-        """Background thread to update display"""
+        """Background thread to update display only when needed"""
         while self.running:
             try:
-                # Only update display if not actively getting input
-                if not self.input_active:
-                    self._render_chat_display()
-                time.sleep(3)  # Update every 3 seconds
+                # Only update if there are new messages
+                current_message_count = len(self.message_handler.get_messages())
+                if current_message_count != self.last_message_count:
+                    self._update_message_area()
+                    self.last_message_count = current_message_count
+                time.sleep(1)  # Check for updates every second
             except Exception:
                 continue
     
-    def _render_chat_display(self):
-        """Render the complete chat display"""
-        # Clear screen completely
-        self._clear_screen()
+    def _update_message_area(self):
+        """Update only the message area without affecting input"""
+        # Save current cursor position
+        print("\033[s", end="")  # Save cursor position
         
-        # Get terminal dimensions
-        width = min(80, self.console.size.width)
+        # Move to message area (line 5, after header)
+        print("\033[5;1H", end="")  # Move to line 5, column 1
         
-        # Header
-        header = f"🍐 Pear Chat - {self.session_name} ({'Host' if self.is_host else 'Participant'})"
-        border = "=" * (width - 4)
+        # Clear the message area (15 lines)
+        for _ in range(15):
+            print("\033[2K")  # Clear current line
         
-        print(f"\033[1;36m{border}\033[0m")
-        print(f"\033[1;36m{header.center(len(border))}\033[0m") 
-        print(f"\033[1;36m{border}\033[0m")
-        print()
+        # Move back to start of message area
+        print("\033[5;1H", end="")
         
-        # Messages section
-        print("\033[1;32m💬 Messages:\033[0m")
-        print("─" * (width - 4))
-        
+        # Display messages
         messages = self.message_handler.get_messages()
         if messages:
-            # Show last 10 messages to keep it clean
-            for msg in messages[-10:]:
+            # Show last 13 messages (leave space for "no messages" line)
+            for msg in messages[-13:]:
                 timestamp = datetime.fromtimestamp(msg.timestamp).strftime("%H:%M:%S")
                 if msg.message_type == "system":
                     print(f"\033[33m[{timestamp}] * {msg.content}\033[0m")
                 else:
-                    user_color = "\033[1;32m" if msg.username == self.current_user else "\033[1;34m"
-                    print(f"\033[90m[{timestamp}]\033[0m {user_color}{msg.username}:\033[0m {msg.content}")
+                    if msg.username == self.current_user:
+                        # Your messages in green
+                        print(f"\033[90m[{timestamp}]\033[0m \033[1;32m{msg.username}:\033[0m {msg.content}")
+                    else:
+                        # Other users in blue
+                        print(f"\033[90m[{timestamp}]\033[0m \033[1;34m{msg.username}:\033[0m {msg.content}")
         else:
             print("\033[90mNo messages yet... Start chatting!\033[0m")
         
-        print()
-        
-        # Users section
-        print("\033[1;34m👥 Users:\033[0m")
-        print("─" * 20)
-        
-        # Mock users for now
-        users = [
-            (self.current_user, "online", True),
-            ("alice", "online", False),
-            ("bob", "typing", False)
-        ]
-        
-        for name, status, is_self in users:
-            status_icon = "🟢" if status == "online" else "🟡"
-            name_display = f"{name} (you)" if is_self else name
-            color = "\033[1;36m" if is_self else "\033[37m"
-            print(f"{color}{status_icon} {name_display}\033[0m")
-        
-        print()
-        print("─" * (width - 4))
-        print("\033[90m/help for commands • /quit to exit\033[0m")
-        print()
+        # Restore cursor position
+        print("\033[u", end="", flush=True)  # Restore cursor position
     
     def _input_loop(self):
-        """Main input loop"""
-        # Initial display
-        self._render_chat_display()
-        
+        """Main input loop with persistent input prompt"""        
         while self.running:
             try:
-                # Get user input
-                user_input = input("\033[1;36m💬 Message: \033[0m").strip()
+                # Display persistent input prompt
+                print("\033[1;37m> \033[0m", end="", flush=True)
+                user_input = input().strip()
+                
+                # Clear the input line after hitting enter
+                print("\033[1A\033[2K", end="")  # Move up one line and clear it
                 
                 if not user_input:
                     continue
@@ -164,9 +159,6 @@ class SimpleTerminalInterface:
                     # Mock: simulate sending to network
                     if hasattr(self, 'network_manager'):
                         self.network_manager.send_message(user_input, self.current_user)
-                
-                # Trigger immediate display update
-                self._render_chat_display()
                         
             except (EOFError, KeyboardInterrupt):
                 self.running = False
@@ -186,7 +178,7 @@ class SimpleTerminalInterface:
             self.running = False
         elif cmd == "clear":
             self.message_handler.clear_messages()
-            self._clear_screen()
+            self._render_initial_display()
         elif cmd == "stats":
             self._show_stats()
         elif cmd == "users":
@@ -227,8 +219,9 @@ class SimpleTerminalInterface:
             print("\033[33mNo active sessions found on the network\033[0m")
             return
         
-        print("\n\033[1;36m🍐 Available Chat Sessions\033[0m")
-        print("=" * 40)
+        print()
+        print("\033[1;36m🍐 Available Chat Sessions\033[0m")
+        print("\033[36m" + "=" * 30 + "\033[0m")
         
         for i, session in enumerate(sessions, 1):
             print(f"{i}. \033[1;32m{session['name']}\033[0m")
@@ -245,13 +238,8 @@ class SimpleTerminalInterface:
     
     def show_startup_banner(self):
         """Show the startup banner"""
-        banner = """
-\033[1;36m
-╔════════════════════════════════════════╗
-║            🍐 Pear Chat                ║
-║     P2P Terminal Messaging             ║
-╚════════════════════════════════════════╝
-\033[0m
-Real-time messaging on your local network
-"""
-        print(banner) 
+        print()
+        print("\033[1;36m🍐 Pear Chat\033[0m")
+        print("\033[36mP2P Terminal Messaging\033[0m")
+        print("\033[36m" + "=" * 25 + "\033[0m")
+        print() 
