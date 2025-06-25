@@ -2,8 +2,7 @@
 
 P2P terminal chat for local networks.
 
-<img width="1510" alt="image" src="https://github.com/user-attachments/assets/
-aa79773c-2e4c-435e-9fad-e0079dd168a6" />
+<img width="1510" alt="image" src="https://github.com/user-attachments/assets/aa79773c-2e4c-435e-9fad-e0079dd168a6" />
 
 ## Install
 
