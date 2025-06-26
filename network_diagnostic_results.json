@@ -1,0 +1,111 @@
+[
+  {
+    "test_name": "Basic Network Info",
+    "status": "pass",
+    "message": "Network interface available: 10.0.0.143",
+    "details": {
+      "hostname": "g-mac.local",
+      "local_ip": "10.0.0.143",
+      "external_ip": "67.180.83.131",
+      "platform": "Darwin"
+    }
+  },
+  {
+    "test_name": "Port Availability",
+    "status": "pass",
+    "message": "Default ports available: [8888, 8889]",
+    "details": {
+      "available": [
+        8888,
+        8889,
+        9999,
+        7777,
+        6666
+      ],
+      "unavailable": []
+    }
+  },
+  {
+    "test_name": "UDP Broadcast",
+    "status": "pass",
+    "message": "UDP broadcast working to 10.0.0.255",
+    "details": {
+      "broadcast_address": "10.0.0.255"
+    }
+  },
+  {
+    "test_name": "TCP Connectivity",
+    "status": "pass",
+    "message": "TCP server and client functionality working",
+    "details": {
+      "local_ip": "10.0.0.143",
+      "port": 8889
+    }
+  },
+  {
+    "test_name": "Firewall Detection",
+    "status": "pass",
+    "message": "Basic outbound connectivity working",
+    "details": {
+      "blocked_services": 0,
+      "total_tested": 2
+    }
+  },
+  {
+    "test_name": "Network Type Detection",
+    "status": "pass",
+    "message": "Detected network type: corporate (confidence: 2)",
+    "details": {
+      "type": "corporate",
+      "confidence": 2,
+      "indicators": {
+        "corporate": 2,
+        "home": 1,
+        "public": 0
+      }
+    }
+  },
+  {
+    "test_name": "NAT Detection",
+    "status": "warning",
+    "message": "Behind NAT: Local 10.0.0.143 != External 67.180.83.131",
+    "details": {
+      "local_ip": "10.0.0.143",
+      "external_ip": "67.180.83.131"
+    }
+  },
+  {
+    "test_name": "DNS Resolution",
+    "status": "pass",
+    "message": "DNS resolution working",
+    "details": {}
+  },
+  {
+    "test_name": "Network Interfaces",
+    "status": "pass",
+    "message": "Network interfaces accessible (14 inet addresses found)",
+    "details": {
+      "interface_count": 14
+    }
+  },
+  {
+    "test_name": "Routing Information",
+    "status": "warning",
+    "message": "Cannot access routing information",
+    "details": {}
+  },
+  {
+    "test_name": "Proxy Detection",
+    "status": "pass",
+    "message": "No proxy environment variables detected",
+    "details": {}
+  },
+  {
+    "test_name": "Alternative Ports",
+    "status": "warning",
+    "message": "No alternative ports found",
+    "details": {
+      "available_ports": []
+    }
+  }
+]
