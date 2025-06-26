@@ -4,7 +4,7 @@ Message System - Handles chat messages and routing
 
 import time
 from typing import List, Callable, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 

@@ -9,10 +9,8 @@ import socket
 import threading
 import time
 import json
-import struct
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
-import uuid
 import os
 from rich.console import Console
 
@@ -464,7 +462,7 @@ class EnhancedNetworkManager:
                 discovery_sock.close()
                 break  # If successful, don't try other ports
                 
-            except Exception as e:
+            except Exception:
                 if discovery_sock:
                     discovery_sock.close()
                 continue

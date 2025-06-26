@@ -5,7 +5,6 @@ Handles user preferences and configuration storage
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 

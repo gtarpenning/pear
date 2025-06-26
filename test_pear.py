@@ -6,10 +6,8 @@ Tests core functionality with minimal mocking
 
 import unittest
 import time
-import threading
-from unittest.mock import patch, MagicMock
 
-from message_system import MessageHandler, ChatMessage, MockMessageRouter
+from message_system import MessageHandler, MockMessageRouter
 from network_layer import NetworkManager, PeerInfo
 from pear_cli import PearCLI
 

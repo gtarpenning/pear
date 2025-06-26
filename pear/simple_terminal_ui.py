@@ -6,7 +6,6 @@ Uses only standard terminal operations and ANSI codes
 import os
 import threading
 import time
-import json
 import shutil
 from typing import Optional, List
 from datetime import datetime
@@ -73,7 +72,7 @@ class SimpleTerminalInterface:
         # Add welcome messages
         if is_host:
             message_handler.add_system_message(f"Started chat session: {session_name}")
-            message_handler.add_system_message(f"You are hosting this session")
+            message_handler.add_system_message("You are hosting this session")
         else:
             message_handler.add_system_message(f"Joined chat session: {session_name}")
 

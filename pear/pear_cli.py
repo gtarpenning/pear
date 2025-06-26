@@ -21,7 +21,7 @@ class PearCLI:
     def __init__(self, username: Optional[str] = None):
         self.config = PearConfig()
         self.console = Console()
-        self.username = username or self.config.get_username()
+        self.username = username or self.config.get_username() or "user"
         self.network_manager = NetworkManager()
         self.message_handler = MessageHandler()
         self.terminal_ui = SimpleTerminalInterface(self.username)
@@ -37,8 +37,14 @@ class PearCLI:
         self.network_manager.create_session(session_name)
 
         # Initialize network components
-        self.network_manager.start_discovery_service()
-        self.network_manager.start_message_server()
+        discovery_success = self.network_manager.start_discovery_service()
+        server_success = self.network_manager.start_message_server()
+
+        if not discovery_success or not server_success:
+            self.console.print("[yellow]⚠ Network setup had issues - session may not be discoverable[/yellow]")
+            self.console.print("[cyan]Others can still connect directly using:[/cyan]")
+            self.console.print(f"[white]  pear connect {self.network_manager.local_ip}[/white]")
+            print()  # Add space before chat interface
 
         # Start the chat interface
         self.terminal_ui.start_chat_interface(
@@ -72,6 +78,11 @@ class PearCLI:
                 print("\nCancelled")
                 return
 
+        # At this point session_name should not be None
+        if not session_name:
+            print("No session name provided")
+            return
+
         print(f"Joining chat session: {session_name}")
 
         # Connect to the session
@@ -83,6 +94,41 @@ class PearCLI:
         # Start the chat interface
         self.terminal_ui.start_chat_interface(
             session_name=session_name,
+            is_host=False,
+            message_handler=self.message_handler,
+            network_manager=self.network_manager,
+        )
+
+    def connect_direct(self, target: str, port: Optional[int] = None):
+        """Connect directly to a host using IP address (bypasses discovery)"""
+        if not port:
+            port = 8889  # Default message port
+        
+        # Parse target in case it includes port (e.g., "192.168.1.100:8889")
+        if ':' in target:
+            parts = target.split(':')
+            target = parts[0]
+            try:
+                port = int(parts[1])
+            except (ValueError, IndexError):
+                self.console.print("[red]Invalid port in target address[/red]")
+                return
+
+        self.console.print(f"[cyan]Attempting direct connection to {target}:{port}[/cyan]")
+
+        # Connect directly to the session
+        success = self.network_manager.connect_to_session_direct(target, port)
+        if not success:
+            self.console.print(f"[red]Failed to connect directly to {target}:{port}[/red]")
+            self.console.print("[yellow]Troubleshooting tips:[/yellow]")
+            self.console.print("  • Verify the host is running and hosting a session")
+            self.console.print("  • Check if the port is correct (default: 8889)")
+            self.console.print("  • Ensure no firewall is blocking the connection")
+            return
+
+        # Start the chat interface
+        self.terminal_ui.start_chat_interface(
+            session_name=f"direct_{target}_{port}",
             is_host=False,
             message_handler=self.message_handler,
             network_manager=self.network_manager,
@@ -116,15 +162,28 @@ class PearCLI:
         self.console.print(
             f"[green]Found one session: {session['name']} (host: {session['host']}, users: {session['user_count']})[/green]"
         )
-        self.console.print("[cyan]Auto-joining...[/cyan]")
-        self.join_session(session["name"])
+        
+        # Prompt user instead of auto-joining
+        try:
+            response = input("\nWould you like to join? (y/n): ").strip().lower()
+            if response == 'y':
+                self.join_session(session["name"])
+            else:
+                self.console.print("[cyan]Exiting...[/cyan]")
+        except KeyboardInterrupt:
+            self.console.print("\n[yellow]Cancelled[/yellow]")
 
     def _handle_multiple_sessions(self, sessions):
         """Handle case when multiple sessions are found"""
         self._display_session_list(sessions)
 
-        if self._user_wants_to_join():
-            self._handle_session_selection(sessions)
+        session_choice = self._user_wants_to_join()
+        if session_choice is not False and isinstance(session_choice, int):
+            if 0 <= session_choice < len(sessions):
+                selected_session = sessions[session_choice]["name"]
+                self.join_session(selected_session)
+            else:
+                self.console.print("[red]Invalid session number[/red]")
         else:
             self.console.print("[cyan]Exiting...[/cyan]")
             sys.exit(0)
@@ -139,20 +198,19 @@ class PearCLI:
 
     def _user_wants_to_join(self):
         """Ask user if they want to join a session"""
-        self.console.print("\nWould you like to join? (y/n)")
-        return input().strip().lower() == "y"
-
-    def _handle_session_selection(self, sessions):
-        """Handle user selection of session to join"""
         try:
-            session_choice = int(input("Select session number: ")) - 1
-            if 0 <= session_choice < len(sessions):
-                selected_session = sessions[session_choice]["name"]
-                self.join_session(selected_session)
-            else:
-                self.console.print("[red]Invalid selection[/red]")
-        except (ValueError, KeyboardInterrupt):
-            self.console.print("\n[yellow]Cancelled[/yellow]")
+            response = input("\nWhich session would you like to join? (Enter number or 'n' to exit): ").strip().lower()
+            if response == 'n':
+                return False
+            # Try to parse as session number
+            try:
+                session_num = int(response) - 1
+                return session_num  # Return the session index
+            except ValueError:
+                self.console.print("[red]Invalid input. Please enter a number or 'n'[/red]")
+                return False
+        except KeyboardInterrupt:
+            return False
 
     def login(self, username: Optional[str] = None):
         """Store username in config for future use"""
@@ -216,8 +274,17 @@ def main():
         "session_name", nargs="?", help="Name of the session to join"
     )
 
+    # Connect direct command
+    connect_parser = subparsers.add_parser("connect", help="Connect directly to a host by IP address")
+    connect_parser.add_argument(
+        "target", help="IP address or hostname to connect to (can include port like 192.168.1.100:8889)"
+    )
+    connect_parser.add_argument(
+        "-p", "--port", type=int, default=8889, help="Port to connect to (default: 8889)"
+    )
+
     # List command
-    list_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "list", help="List available sessions on network"
     )
 
@@ -226,7 +293,7 @@ def main():
     login_parser.add_argument("username", nargs="?", help="Username to save")
 
     # Config command
-    config_parser = subparsers.add_parser("config", help="Show current configuration")
+    subparsers.add_parser("config", help="Show current configuration")
 
     args = parser.parse_args()
 
@@ -241,6 +308,8 @@ def main():
             pear.start_session(args.session_name)
         elif args.command == "join":
             pear.join_session(args.session_name)
+        elif args.command == "connect":
+            pear.connect_direct(args.target, args.port)
         elif args.command == "list":
             pear.list_sessions()
         elif args.command == "login":

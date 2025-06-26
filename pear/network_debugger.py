@@ -5,19 +5,15 @@ Diagnoses connectivity issues and tests different network configurations
 """
 
 import socket
-import threading
 import time
 import json
-import sys
 import subprocess
 import platform
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, TaskID
-import uuid
+from rich.progress import Progress
 
 console = Console()
 
@@ -616,7 +612,7 @@ def main():
             console.print(f"  {rec}")
     
     # Export results
-    console.print(f"\n[dim]Results exported to: network_diagnostic_results.json[/dim]")
+    console.print("\n[dim]Results exported to: network_diagnostic_results.json[/dim]")
     with open("network_diagnostic_results.json", "w") as f:
         json.dump([{
             "test_name": d.test_name,
