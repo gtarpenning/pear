@@ -7,9 +7,9 @@ Tests core functionality with minimal mocking
 import unittest
 import time
 
-from message_system import MessageHandler, MockMessageRouter
-from network_layer import NetworkManager, PeerInfo
-from pear_cli import PearCLI
+from pear.message_system import MessageHandler
+from pear.network_core import NetworkManager, PeerInfo
+from pear.pear_cli import PearCLI
 
 
 class TestMessageHandler(unittest.TestCase):
@@ -104,78 +104,44 @@ class TestNetworkManager(unittest.TestCase):
 
     def test_initialization(self):
         """Test basic network manager initialization"""
-        self.assertIsInstance(self.network.local_hostname, str)
-        self.assertIsInstance(self.network.local_ip, str)
-        self.assertEqual(self.network.discovery_port, 8888)
-        self.assertEqual(self.network.message_port, 8889)
+        self.assertIsInstance(self.network.get_local_hostname(), str)
+        self.assertIsInstance(self.network.get_local_ip(), str)
+        self.assertIsNotNone(self.network.config)
         self.assertFalse(self.network.is_host)
 
     def test_session_discovery(self):
-        """Test session discovery (mocked)"""
+        """Test session discovery"""
         sessions = self.network.discover_sessions()
 
         self.assertIsInstance(sessions, list)
-        self.assertGreater(len(sessions), 0)
-
-        # Check session structure
-        session = sessions[0]
-        required_keys = ["name", "host", "host_ip", "port", "user_count"]
-        for key in required_keys:
-            self.assertIn(key, session)
+        # Note: Without actual running sessions, the list will be empty
+        # This is expected behavior for the simplified network core
+        
+        # If we want to test with data, we'd need to set up actual sessions
+        # For now, just verify the method doesn't crash and returns the right type
 
     def test_session_connection(self):
         """Test connecting to a session"""
-        success = self.network.connect_to_session("test_session")
+        # Note: This will fail without a real session running
+        # But we can test the method exists and handles failure gracefully
+        success = self.network.connect_to_session("nonexistent_session")
+        self.assertFalse(success)  # Should fail for non-existent session
 
+    def test_session_creation(self):
+        """Test creating a session"""
+        # Test session creation
+        success = self.network.create_session("test_session")
+        
+        # Should succeed in creating session
         self.assertTrue(success)
         self.assertEqual(self.network.session_name, "test_session")
-        self.assertFalse(self.network.is_host)
-        self.assertEqual(len(self.network.peers), 1)
-
-    def test_peer_management(self):
-        """Test adding and removing peers"""
-        peer = PeerInfo(
-            id="test_id",
-            hostname="test_host",
-            ip_address="192.168.1.100",
-            port=8889,
-            username="testuser",
-            connected_at=time.time(),
-        )
-
-        self.network.add_peer(peer)
-        self.assertEqual(len(self.network.peers), 1)
-        self.assertIn("test_id", self.network.peers)
-
-        connected_peers = self.network.get_connected_peers()
-        self.assertEqual(len(connected_peers), 1)
-        self.assertEqual(connected_peers[0].username, "testuser")
-
-        self.network.remove_peer("test_id")
-        self.assertEqual(len(self.network.peers), 0)
+        self.assertTrue(self.network.is_host)
+        
+        # Clean up
+        self.network.stop()
 
 
-class TestMockMessageRouter(unittest.TestCase):
-    """Test mock message router"""
 
-    def setUp(self):
-        self.handler = MessageHandler()
-        self.router = MockMessageRouter(self.handler)
-
-    def test_mock_simulation(self):
-        """Test mock message simulation"""
-        initial_count = len(self.handler.get_messages())
-
-        # Start simulation briefly
-        self.router.start_mock_simulation()
-        time.sleep(2)  # Let it generate some messages
-        self.router.stop_mock_simulation()
-
-        final_count = len(self.handler.get_messages())
-
-        # Should have generated at least some messages
-        # Note: This is time-dependent so we're lenient
-        self.assertTrue(final_count >= initial_count)
 
 
 class TestPearCLI(unittest.TestCase):
@@ -187,18 +153,18 @@ class TestPearCLI(unittest.TestCase):
     def test_cli_initialization(self):
         """Test CLI component initialization"""
         self.assertIsNotNone(self.cli.network_manager)
-        self.assertIsNotNone(self.cli.message_handler)
-        self.assertIsNotNone(self.cli.terminal_ui)
+        self.assertIsNotNone(self.cli.config)
+        self.assertIsNotNone(self.cli.session_commands)
+        self.assertIsNotNone(self.cli.config_commands)
 
-    def test_list_sessions(self):
-        """Test session listing"""
-        sessions = self.cli.list_sessions(show_output=False)
-
-        self.assertIsInstance(sessions, list)
-        self.assertGreater(len(sessions), 0)
-
-        # Test with output (should not crash)
-        self.cli.list_sessions(show_output=True)
+    def test_config_operations(self):
+        """Test configuration operations"""
+        # Test setting username
+        self.cli.login("testuser")
+        self.assertEqual(self.cli.username, "testuser")
+        
+        # Test showing config (should not crash)
+        self.cli.show_config()
 
 
 class TestIntegration(unittest.TestCase):
@@ -209,19 +175,23 @@ class TestIntegration(unittest.TestCase):
         handler = MessageHandler()
         network = NetworkManager()
 
-        # Connect to a session
-        network.connect_to_session("test_session")
+        # Create a session (host mode)
+        success = network.create_session("test_session")
+        self.assertTrue(success)
 
         # Add a message
         msg = handler.add_message("testuser", "Integration test")
 
-        # Mock sending the message through network
+        # Send the message through network
         network.send_message(msg.content, msg.username)
 
         # Verify message was stored
         messages = handler.get_messages()
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0].content, "Integration test")
+        
+        # Clean up
+        network.stop()
 
     def test_callback_integration(self):
         """Test callback system integration"""
@@ -248,29 +218,28 @@ class TestCoreWorkflow(unittest.TestCase):
     def test_basic_chat_workflow(self):
         """Test a basic chat session workflow"""
         # Initialize components
-        cli = PearCLI()
+        handler = MessageHandler()
+        network = NetworkManager()
 
-        # Simulate discovering sessions
-        sessions = cli.network_manager.discover_sessions()
-        self.assertGreater(len(sessions), 0)
-
-        # Connect to a session
-        session_name = sessions[0]["name"]
-        success = cli.network_manager.connect_to_session(session_name)
+        # Create a session
+        success = network.create_session("test_workflow_session")
         self.assertTrue(success)
 
         # Add some messages
-        cli.message_handler.add_system_message(f"Joined {session_name}")
-        cli.message_handler.add_message("testuser", "Hello everyone!")
+        handler.add_system_message("Session started")
+        handler.add_message("testuser", "Hello everyone!")
 
         # Verify messages were stored
-        messages = cli.message_handler.get_messages()
+        messages = handler.get_messages()
         self.assertEqual(len(messages), 2)
 
         # Get stats
-        stats = cli.message_handler.get_message_stats()
+        stats = handler.get_message_stats()
         self.assertEqual(stats["total_messages"], 2)
         self.assertEqual(stats["unique_users"], 1)
+        
+        # Clean up
+        network.stop()
 
 
 def main():

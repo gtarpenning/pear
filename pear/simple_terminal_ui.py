@@ -29,6 +29,7 @@ class SimpleTerminalInterface:
         self.terminal_height = 24  # Default fallback
         self.terminal_width = 80  # Default fallback
         self.username_colors = {}  # Dictionary to store username-color assignments
+        self.input_active = False  # Track when user is actively typing
         self.available_colors = [
             "\033[1;31m",  # Red
             "\033[1;32m",  # Green
@@ -127,9 +128,10 @@ class SimpleTerminalInterface:
         print("\033[36m" + "=" * min(50, self.terminal_width) + "\033[0m")
         print()
 
-        # Calculate available space for messages
-        # Header: 4 lines, Footer: 3 lines, Input: 1 line = 8 lines total reserved
-        self.message_area_height = max(5, self.terminal_height - 8)
+        # Calculate available space for messages with more conservative buffer
+        # Header: 4 lines, Footer: 3 lines, Input prompt: 2 lines = 9 lines total reserved
+        # Add extra buffer of 2 lines to prevent cutting off messages
+        self.message_area_height = max(3, self.terminal_height - 11)
 
         # Reserve space for messages
         for _ in range(self.message_area_height):
@@ -167,19 +169,26 @@ class SimpleTerminalInterface:
 
                 # Only update if there are new messages or terminal was resized
                 current_message_count = len(self.message_handler.get_messages())
-                if (
+                needs_update = (
                     current_message_count != self.last_message_count
                     or old_height != self.terminal_height
-                ):
+                )
+                
+                if needs_update:
                     if old_height != self.terminal_height:
-                        # Terminal was resized, recalculate layout
-                        self.message_area_height = max(5, self.terminal_height - 8)
+                        # Terminal was resized, recalculate layout with new buffer
+                        self.message_area_height = max(3, self.terminal_height - 11)
                         self._render_initial_display()
                     else:
-                        # Just update messages
-                        self._update_message_area()
+                        # Update messages, but be gentle if user is typing
+                        if not self.input_active:
+                            # User not typing, safe to update and restore prompt
+                            self._update_message_area()
+                        else:
+                            # User is typing, just update the message area without touching input
+                            self._update_message_area_quiet()
                     self.last_message_count = current_message_count
-                time.sleep(1)  # Check for updates every second
+                time.sleep(0.5)  # Check for updates every half second for more responsive UI
             except Exception:
                 continue
 
@@ -198,32 +207,99 @@ class SimpleTerminalInterface:
         # Move back to start of message area
         print("\033[5;1H", end="")
 
-        # Display messages
+        # Display messages with improved scrolling
         messages = self.message_handler.get_messages()
         if messages:
-            # Calculate how many messages we can show (leave 1 line buffer)
-            max_messages = max(1, self.message_area_height - 1)
-
-            # Show only the most recent messages that fit
-            for msg in messages[-max_messages:]:
+            # Use the full message area height, no additional buffer
+            # The buffer is already accounted for in the layout calculation
+            max_messages = self.message_area_height
+            
+            # Get the most recent messages that fit
+            display_messages = messages[-max_messages:] if len(messages) > max_messages else messages
+            
+            # Display each message, ensuring we don't exceed the area
+            lines_used = 0
+            for msg in display_messages:
+                if lines_used >= self.message_area_height:
+                    break
+                    
                 formatted_message = self._format_message(msg)
-                print(formatted_message)
+                
+                # Handle message wrapping for long messages
+                wrapped_lines = self._wrap_message(formatted_message)
+                
+                # Check if we have space for all wrapped lines
+                if lines_used + len(wrapped_lines) <= self.message_area_height:
+                    for line in wrapped_lines:
+                        print(line)
+                        lines_used += 1
+                else:
+                    # If the message won't fit, show truncation indicator
+                    if lines_used < self.message_area_height:
+                        print("\033[90m... (more messages above)\033[0m")
+                    break
         else:
             print("\033[90mNo messages yet... Start chatting!\033[0m")
 
-        # Restore cursor position
+        # Always restore cursor to input position after updating messages
+        self._position_input_cursor()
+        print("\033[1;37m> \033[0m", end="", flush=True)
+
+    def _update_message_area_quiet(self):
+        """Update message area without affecting input (used when user is typing)"""
+        # Save current cursor position
+        print("\033[s", end="")
+
+        # Move to message area (line 5, after header)
+        print("\033[5;1H", end="")
+
+        # Clear the message area using dynamic height
+        for _ in range(self.message_area_height):
+            print("\033[2K")
+
+        # Move back to start of message area
+        print("\033[5;1H", end="")
+
+        # Display messages with improved scrolling
+        messages = self.message_handler.get_messages()
+        if messages:
+            max_messages = self.message_area_height
+            display_messages = messages[-max_messages:] if len(messages) > max_messages else messages
+            
+            lines_used = 0
+            for msg in display_messages:
+                if lines_used >= self.message_area_height:
+                    break
+                    
+                formatted_message = self._format_message(msg)
+                wrapped_lines = self._wrap_message(formatted_message)
+                
+                if lines_used + len(wrapped_lines) <= self.message_area_height:
+                    for line in wrapped_lines:
+                        print(line)
+                        lines_used += 1
+                else:
+                    if lines_used < self.message_area_height:
+                        print("\033[90m... (more messages above)\033[0m")
+                    break
+        else:
+            print("\033[90mNo messages yet... Start chatting!\033[0m")
+
+        # Restore original cursor position (don't mess with input)
         print("\033[u", end="", flush=True)
 
     def _input_loop(self):
         """Main input loop with input at bottom of terminal"""
         while self.running:
             try:
-                # Simple approach: let input() work naturally at current cursor position
-                print("\033[1;37m> \033[0m", end="", flush=True)
+                # Mark that input is active to reduce display interference
+                self.input_active = True
                 user_input = input().strip()
+                self.input_active = False
 
-                # After input(), cursor is naturally on next line, just clear the previous line
-                print("\033[1A\033[2K", end="", flush=True)  # Move up and clear
+                # Clear the input line after getting input
+                self._position_input_cursor()
+                print("\033[2K", end="", flush=True)  # Clear the current line
 
                 if not user_input:
                     continue
@@ -240,9 +316,12 @@ class SimpleTerminalInterface:
 
             except (EOFError, KeyboardInterrupt):
                 self.running = False
+                self.input_active = False
                 break
             except Exception as e:
-                print(f"\033[31mError: {e}\033[0m")
+                self.input_active = False
+                # Add error to message system instead of printing directly
+                self.message_handler.add_system_message(f"Error: {e}")
                 time.sleep(1)
                 continue
 
@@ -489,7 +568,7 @@ Note: AI assistant runs on host's computer and responds to everyone"""
         self.message_handler.add_system_message(users_text)
 
     def show_session_list(self, sessions: List[dict]):
-        """Show available sessions"""
+        """Show available sessions (called before chat interface starts)"""
         if not sessions:
             print("\033[33mNo active sessions found on the network\033[0m")
             return
@@ -505,14 +584,14 @@ Note: AI assistant runs on host's computer and responds to everyone"""
             print()
 
     def show_connection_status(self, session_name: str, success: bool):
-        """Show connection status"""
+        """Show connection status (called before chat interface starts)"""
         if success:
             print(f"\033[32m✅ Successfully connected to {session_name}\033[0m")
         else:
             print(f"\033[31m❌ Failed to connect to {session_name}\033[0m")
 
     def show_startup_banner(self):
-        """Show the startup banner"""
+        """Show the startup banner (called before chat interface starts)"""
         print()
         print("\033[1;36m🍐 Pear Chat\033[0m")
         print("\033[36mP2P Terminal Messaging\033[0m")
@@ -594,3 +673,31 @@ Note: AI assistant runs on host's computer and responds to everyone"""
             else:
                 # Other users with their assigned colors
                 return f"\033[90m[{timestamp}]\033[0m {color}{msg.username}:\033[0m {msg.content}"
+    
+    def _wrap_message(self, message: str) -> List[str]:
+        """Wrap a message to fit within terminal width"""
+        if not message:
+            return [""]
+        
+        # Calculate usable width (account for some margin)
+        usable_width = max(40, self.terminal_width - 4)
+        
+        # Simple line wrapping - split long lines
+        lines = []
+        current_line = message
+        
+        while len(current_line) > usable_width:
+            # Find a good break point (prefer spaces)
+            break_point = usable_width
+            for i in range(usable_width - 10, usable_width):
+                if i < len(current_line) and current_line[i] == ' ':
+                    break_point = i
+                    break
+            
+            lines.append(current_line[:break_point])
+            current_line = current_line[break_point:].lstrip()
+        
+        if current_line:
+            lines.append(current_line)
+        
+        return lines if lines else [message]
