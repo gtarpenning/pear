@@ -1,5 +1,7 @@
 # Pear Chat
 
+**TL;DR:** Terminal-based P2P chat for local networks. `pip install pear-chat` → `pear start mysession` → others run `pear join mysession`.
+
 P2P terminal chat for local networks.
 
 <img width="1510" alt="image" src="https://github.com/user-attachments/assets/aa79773c-2e4c-435e-9fad-e0079dd168a6" />
